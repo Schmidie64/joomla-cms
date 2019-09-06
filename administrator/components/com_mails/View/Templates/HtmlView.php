@@ -17,6 +17,7 @@ use Joomla\CMS\MVC\View\GenericDataException;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
 use Joomla\CMS\Toolbar\Toolbar;
 use Joomla\CMS\Toolbar\ToolbarHelper;
+use Joomla\Component\Mails\Administrator\Model\TemplatesModel;
 
 /**
  * View for the mail templates configuration
@@ -78,20 +79,22 @@ class HtmlView extends BaseHtmlView
 	 */
 	public function display($tpl = null)
 	{
-		$this->items         = $this->get('Items');
-		$this->languages     = $this->get('Languages');
-		$this->pagination    = $this->get('Pagination');
-		$this->state         = $this->get('State');
-		$this->filterForm    = $this->get('FilterForm');
-		$this->activeFilters = $this->get('ActiveFilters');
+		/** @var TemplatesModel $model */
+		$model               = $this->getModel();
+		$this->items         = $model->getItems();
+		$this->languages     = $model->getLanguages();
+		$this->pagination    = $model->getPagination();
+		$this->state         = $model->getState();
+		$this->filterForm    = $model->getFilterForm();
+		$this->activeFilters = $model->getActiveFilters();
 
 		// Check for errors.
-		if (count($errors = $this->get('Errors')))
+		if (count($errors = $model->getErrors()))
 		{
 			throw new GenericDataException(implode("\n", $errors), 500);
 		}
 
-		$cache = array();
+		$cache    = [];
 		$language = Factory::getLanguage();
 
 		foreach ($this->items as $item)
@@ -123,12 +126,16 @@ class HtmlView extends BaseHtmlView
 	{
 		// Get the toolbar object instance
 		$toolbar = Toolbar::getInstance('toolbar');
-		$user = Factory::getUser();
+		$user    = Factory::getUser();
 
 		ToolbarHelper::title(Text::_('COM_MAILS_MAILS_TITLE'), 'envelope');
 
 		if ($user->authorise('core.admin', 'com_mails') || $user->authorise('core.options', 'com_mails'))
 		{
+			$toolbar->popupButton('send_test-mail')
+				->text("COM_MAILS_SEND_TEST_MAIL")
+				->selector("collapseModal")
+				->icon('icon-envelope');
 			$toolbar->preferences('com_mails');
 		}
 

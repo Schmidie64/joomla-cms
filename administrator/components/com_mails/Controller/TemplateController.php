@@ -14,6 +14,7 @@ defined('_JEXEC') or die;
 use Joomla\CMS\Application\CMSApplication;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Text;
+use Joomla\CMS\Mail\MailTemplate;
 use Joomla\CMS\MVC\Controller\FormController;
 use Joomla\CMS\MVC\Factory\MVCFactoryInterface;
 use Joomla\CMS\Router\Route;
@@ -45,6 +46,7 @@ class TemplateController extends FormController
 
 		$this->view_item = 'template';
 		$this->view_list = 'templates';
+		$this->registerTask('sendTestMail', 'sendTestMail');
 	}
 
 	/**
@@ -81,7 +83,7 @@ class TemplateController extends FormController
 
 		// Get the previous record id (if any) and the current record id.
 		$template_id = $this->input->getCmd('template_id');
-		$language = $this->input->getCmd('language');
+		$language    = $this->input->getCmd('language');
 
 		// Access check.
 		if (!$this->allowEdit(array('template_id' => $template_id, 'language' => $language), $template_id))
@@ -126,8 +128,8 @@ class TemplateController extends FormController
 	protected function getRedirectToItemAppend($recordId = null, $urlVar = 'id')
 	{
 		$language = array_pop($recordId);
-		$return = parent::getRedirectToItemAppend(array_pop($recordId), $urlVar);
-		$return .= '&language=' . $language;
+		$return   = parent::getRedirectToItemAppend(array_pop($recordId), $urlVar);
+		$return   .= '&language=' . $language;
 
 		return $return;
 	}
@@ -148,17 +150,17 @@ class TemplateController extends FormController
 		$this->checkToken();
 
 		/** @var \Joomla\CMS\MVC\Model\AdminModel $model */
-		$model = $this->getModel();
-		$data  = $this->input->post->get('jform', array(), 'array');
+		$model   = $this->getModel();
+		$data    = $this->input->post->get('jform', array(), 'array');
 		$context = "$this->option.edit.$this->context";
-		$task = $this->getTask();
+		$task    = $this->getTask();
 
 		$recordId = $this->input->getCmd('template_id');
 		$language = $this->input->getCmd('language');
 
 		// Populate the row id from the session.
 		$data['template_id'] = $recordId;
-		$data['language'] = $language;
+		$data['language']    = $language;
 
 		// Access check.
 		if (!$this->allowSave($data, 'template_id'))
@@ -296,5 +298,49 @@ class TemplateController extends FormController
 		$this->postSaveHook($model, $validData);
 
 		return true;
+	}
+
+	/**
+	 * Method to send a test email
+	 *
+	 * @return void
+	 *
+	 * @since  __DEPLOY_VERSION__
+	 */
+	public function sendTestMail(): void
+	{
+		$emails   = explode(",", $this->input->get('jform_email', null, 'string'));
+		$template = $this->input->get('templates', null, 'string');
+
+		if (!$emails || !$template)
+		{
+			$this->setRedirect(Route::_('index.php?option=com_mails&view=templates'));
+			$this->setMessage(Text::_('COM_MAILS_MESSAGE_EMAIL_SEND_FAIL'), 'error');
+
+			return;
+		}
+
+		foreach ($emails as $email)
+		{
+			$email = trim($email);
+
+			if (!filter_var($email, FILTER_VALIDATE_EMAIL))
+			{
+				$this->setRedirect(Route::_('index.php?option=com_mails&view=templates'));
+				$this->setMessage(Text::_('COM_MAILS_MESSAGE_EMAIL_INVALID'), 'error');
+
+				return;
+			}
+
+			$mail   = Factory::getMailer();
+			$mailer = new MailTemplate($template[0], $this->app->getIdentity()->getParam('language', $this->app->get('language')), $mail);
+			$mailer->addTemplateData(
+				['sitename' => $this->app->get('sitename'), 'method' => Text::_('COM_CONFIG_SENDMAIL_METHOD_' . strtoupper($mail->Mailer))]
+			);
+			$mailer->addRecipient($email, '');
+			$mailer->send();
+			$this->setRedirect(Route::_('index.php?option=com_mails&view=templates'));
+			$this->setMessage(Text::_('COM_MAILS_MESSAGE_EMAIL_SEND'));
+		}
 	}
 }

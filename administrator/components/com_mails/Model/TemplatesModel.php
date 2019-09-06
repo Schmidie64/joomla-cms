@@ -11,10 +11,14 @@ namespace Joomla\Component\Mails\Administrator\Model;
 
 defined('_JEXEC') or die;
 
+use Doctrine\Instantiator\Exception\InvalidArgumentException;
 use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\LanguageHelper;
+use Joomla\CMS\Language\Text;
+use Joomla\CMS\Mail\MailTemplate;
 use Joomla\CMS\MVC\Model\ListModel;
+use Joomla\CMS\Router\Route;
 
 /**
  * Methods supporting a list of mail template records.
@@ -86,7 +90,7 @@ class TemplatesModel extends ListModel
 	{
 		$items = parent::getItems();
 
-		$db = $this->getDbo();
+		$db    = $this->getDbo();
 		$query = $db->getQuery(true)
 			->select('language')
 			->from('#__mail_templates')
@@ -113,9 +117,9 @@ class TemplatesModel extends ListModel
 	protected function getListQuery()
 	{
 		// Create a new query object.
-		$db = $this->getDbo();
+		$db    = $this->getDbo();
 		$query = $db->getQuery(true);
-		$user = Factory::getUser();
+		$user  = Factory::getUser();
 
 		// Select the required fields from the table.
 		$query->select(
@@ -170,6 +174,45 @@ class TemplatesModel extends ListModel
 	 */
 	public function getLanguages()
 	{
-		return LanguageHelper::getContentLanguages(array(0,1));
+		return LanguageHelper::getContentLanguages(array(0, 1));
+	}
+
+	/**
+	 * Method to send a test email
+	 *
+	 * @param   string  $emails    Email Recipients
+	 * @param   string  $template  Chosen template for the test-mail
+	 * @param   string  $language  Language for the selected template
+	 *
+	 * @return void
+	 *
+	 * @since  __DEPLOY_VERSION__
+	 */
+	public function sendTestMail(string $emails, string $template, string $language): void
+	{
+		$emails = explode(',', $emails);
+
+		if (!$emails || !$template)
+		{
+			throw new InvalidArgumentException(Text::_('COM_MAILS_MESSAGE_EMAIL_SEND_FAIL'));
+		}
+
+		foreach ($emails as $email)
+		{
+			$email = trim($email);
+
+			if (!filter_var($email, FILTER_VALIDATE_EMAIL))
+			{
+				throw new InvalidArgumentException(Text::_('COM_MAILS_MESSAGE_EMAIL_INVALID'));
+			}
+
+			$mail   = Factory::getMailer();
+			$mailer = new MailTemplate($template[0], $language, $mail);
+			$mailer->addTemplateData(
+				['sitename' => Factory::getConfig()->get('sitename'), 'method' => Text::_('COM_CONFIG_SENDMAIL_METHOD_' . strtoupper($mail->Mailer))]
+			);
+			$mailer->addRecipient($email, '');
+			$mailer->send();
+		}
 	}
 }
