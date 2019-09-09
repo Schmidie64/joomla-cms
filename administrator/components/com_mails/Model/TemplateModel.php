@@ -15,6 +15,7 @@ use Joomla\CMS\Component\ComponentHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\Model\AdminModel;
 use Joomla\CMS\Object\CMSObject;
+use Joomla\Database\ParameterType;
 use Joomla\Registry\Registry;
 use Joomla\Utilities\ArrayHelper;
 
@@ -120,9 +121,9 @@ class TemplateModel extends AdminModel
 		}
 		else
 		{
-			$field = $form->getField('attachments');
+			$field   = $form->getField('attachments');
 			$subform = new \SimpleXmlElement($field->formsource);
-			$files = $subform->xpath('field[@name="file"]');
+			$files   = $subform->xpath('field[@name="file"]');
 			$files[0]->addAttribute('directory', JPATH_ROOT . '/' . $params->get('attachment_folder'));
 			$form->load('<form><field name="attachments" type="subform" '
 				. 'label="COM_MAILS_FIELD_ATTACHMENTS_LABEL" multiple="true" '
@@ -147,8 +148,8 @@ class TemplateModel extends AdminModel
 	public function getItem($pk = null)
 	{
 		$template_id = $this->getState($this->getName() . '.template_id');
-		$language = $this->getState($this->getName() . '.language');
-		$table = $this->getTable('Template', 'Table');
+		$language    = $this->getState($this->getName() . '.language');
+		$table       = $this->getTable('Template', 'Table');
 
 		if ($template_id != '' && $language != '')
 		{
@@ -166,11 +167,11 @@ class TemplateModel extends AdminModel
 
 		// Convert to the CMSObject before adding other data.
 		$properties = $table->getProperties(1);
-		$item = ArrayHelper::toObject($properties, CMSObject::class);
+		$item       = ArrayHelper::toObject($properties, CMSObject::class);
 
 		if (property_exists($item, 'params'))
 		{
-			$registry = new Registry($item->params);
+			$registry     = new Registry($item->params);
 			$item->params = $registry->toArray();
 		}
 
@@ -199,7 +200,7 @@ class TemplateModel extends AdminModel
 	public function getMaster($pk = null)
 	{
 		$template_id = $this->getState($this->getName() . '.template_id');
-		$table = $this->getTable('Template', 'Table');
+		$table       = $this->getTable('Template', 'Table');
 
 		if ($template_id != '')
 		{
@@ -217,11 +218,11 @@ class TemplateModel extends AdminModel
 
 		// Convert to the CMSObject before adding other data.
 		$properties = $table->getProperties(1);
-		$item = ArrayHelper::toObject($properties, CMSObject::class);
+		$item       = ArrayHelper::toObject($properties, CMSObject::class);
 
 		if (property_exists($item, 'params'))
 		{
-			$registry = new Registry($item->params);
+			$registry     = new Registry($item->params);
 			$item->params = $registry->toArray();
 		}
 
@@ -255,7 +256,7 @@ class TemplateModel extends AdminModel
 	protected function loadFormData()
 	{
 		// Check the session for previously entered form data.
-		$app = Factory::getApplication();
+		$app  = Factory::getApplication();
 		$data = $app->getUserState('com_mails.edit.template.data', array());
 
 		if (empty($data))
@@ -279,13 +280,13 @@ class TemplateModel extends AdminModel
 	 */
 	public function save($data)
 	{
-		$table      = $this->getTable();
-		$context    = $this->option . '.' . $this->name;
+		$table   = $this->getTable();
+		$context = $this->option . '.' . $this->name;
 
-		$key = $table->getKeyName();
+		$key         = $table->getKeyName();
 		$template_id = (!empty($data['template_id'])) ? $data['template_id'] : $this->getState($this->getName() . '.template_id');
-		$language = (!empty($data['language'])) ? $data['language'] : $this->getState($this->getName() . '.language');
-		$isNew = true;
+		$language    = (!empty($data['language'])) ? $data['language'] : $this->getState($this->getName() . '.language');
+		$isNew       = true;
 
 		// Include the plugins for the save events.
 		\JPluginHelper::importPlugin($this->events_map['save']);
@@ -389,5 +390,28 @@ class TemplateModel extends AdminModel
 
 		$language = Factory::getApplication()->input->getCmd('language');
 		$this->setState($this->getName() . '.language', $language);
+	}
+
+	/**
+	 * @param   string  $template provides the template_id for db search
+	 * @param   string  $language provides the language for db search
+	 *
+	 * @return array placeholders from provided template
+	 *
+	 * @since __DEPLOY_VERSION__
+	 */
+	public function getPlaceholders(string $template, string $language): array
+	{
+		$db    = $this->getDbo();
+		$query = $db->getQuery(true);
+		$query->select($db->quoteName('params'))
+			->from($db->quoteName('#__mail_templates'))
+			->where($db->quoteName('template_id') . ' = :templateId')
+			->where($db->quoteName('language') . ' = :language')
+			->bind(':templateId', $template, ParameterType::STRING)
+			->bind(':language', $language, ParameterType::STRING);
+		$db->setQuery($query);
+
+		return $db->loadColumn();
 	}
 }

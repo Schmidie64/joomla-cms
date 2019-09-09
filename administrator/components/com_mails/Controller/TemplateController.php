@@ -19,6 +19,7 @@ use Joomla\CMS\MVC\Controller\FormController;
 use Joomla\CMS\MVC\Factory\MVCFactoryInterface;
 use Joomla\CMS\Router\Route;
 use Joomla\CMS\Uri\Uri;
+use Joomla\Registry\Registry;
 
 /**
  * The template controller
@@ -332,11 +333,19 @@ class TemplateController extends FormController
 				return;
 			}
 
-			$mail   = Factory::getMailer();
-			$mailer = new MailTemplate($template[0], $this->app->getIdentity()->getParam('language', $this->app->get('language')), $mail);
-			$mailer->addTemplateData(
-				['sitename' => $this->app->get('sitename'), 'method' => Text::_('COM_CONFIG_SENDMAIL_METHOD_' . strtoupper($mail->Mailer))]
-			);
+			$temp             = $this->getModel()->getPlaceholders($template[0], $this->app->getIdentity()->getParam('language', $this->app->get('language')));
+			$placeholderArray = new Registry($temp[0]);
+			$data             = [];
+			$keys             = $placeholderArray->get('tags');
+			for ($i = 0; $i < count($placeholderArray->get('tags')); $i++)
+			{
+				$data[$i] = Text::_($keys[$i]);
+			}
+			$t                   = array_combine($placeholderArray->get('tags'), $data);
+			$placeholderKeysData = array_combine($keys, $data);
+			$mail                = Factory::getMailer();
+			$mailer              = new MailTemplate($template[0], $this->app->getIdentity()->getParam('language', $this->app->get('language')), $mail);
+			$mailer->addTemplateData($placeholderKeysData);
 			$mailer->addRecipient($email, '');
 			$mailer->send();
 			$this->setRedirect(Route::_('index.php?option=com_mails&view=templates'));
